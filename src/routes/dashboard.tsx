@@ -34,11 +34,15 @@ import {
   MessageCircle,
   BookOpen,
   User,
+  Loader2,
 } from "lucide-react";
 import AIAvatarSelection from "../components/conversation/AIAvatarSelection";
 import TopicSelection from "../components/conversation/TopicSelection";
-import PerformanceSummary from "../components/dashboard/PerformanceSummary";
-import UserDashboard from "../components/dashboard/UserDashboard";
+import {
+  fetchUserDashboardData,
+  DEMO_USER_ID,
+  UserProfileData,
+} from "../services/dashboardService";
 
 interface LanguageStats {
   language: string;
@@ -56,11 +60,57 @@ interface RecentActivity {
   score: number;
 }
 
+interface UpcomingLesson {
+  id: string;
+  title: string;
+  date: string;
+  duration: string;
+}
+
+interface PerformanceData {
+  name: string;
+  score: number;
+}
+
+interface Subscription {
+  plan: string;
+  status: string;
+  renewalDate: string;
+  billingCycle: string;
+  nextPayment: string;
+  features: string[];
+}
+
+interface UserProfile {
+  name: string;
+  email: string;
+  avatar: string;
+  level: string;
+  cefrLevel: string;
+  levelNumber: number;
+  streak: number;
+  totalHours: number;
+  joinDate: string;
+  languageStats: {
+    english: LanguageStats;
+    spanish: LanguageStats;
+  };
+  recentActivities: RecentActivity[];
+  performanceData: PerformanceData[];
+  upcomingLessons: UpcomingLesson[];
+  subscription: Subscription;
+}
+
 const Dashboard = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<
     "english" | "spanish"
   >("english");
   const [showPracticeOptions, setShowPracticeOptions] = useState(false);
+  const [dashboardData, setDashboardData] = useState<UserProfileData | null>(
+    null,
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Check URL parameters to see if we should show practice options
   useEffect(() => {
@@ -70,103 +120,152 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Mock data for the dashboard
-  const mockData = {
-    userProfile: {
-      name: "Alex Johnson",
-      email: "alex.johnson@example.com",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-      level: "Intermediate",
-      streak: 15,
-      totalHours: 42,
-      joinDate: "March 2023",
-    },
-    languageStats: {
-      english: {
-        language: "English",
-        fluency: 68,
-        vocabulary: 72,
-        grammar: 65,
-        pronunciation: 70,
-      },
-      spanish: {
-        language: "Spanish",
-        fluency: 45,
-        vocabulary: 52,
-        grammar: 40,
-        pronunciation: 48,
-      },
-    },
-    recentActivities: [
-      {
-        id: "1",
-        activity: "Business English Conversation",
-        date: "2 hours ago",
-        duration: "25 min",
-        score: 85,
-      },
-      {
-        id: "2",
-        activity: "Travel Vocabulary Practice",
-        date: "Yesterday",
-        duration: "15 min",
-        score: 92,
-      },
-      {
-        id: "3",
-        activity: "Grammar Challenge",
-        date: "3 days ago",
-        duration: "20 min",
-        score: 78,
-      },
-      {
-        id: "4",
-        activity: "Pronunciation Exercise",
-        date: "5 days ago",
-        duration: "10 min",
-        score: 88,
-      },
-    ],
-    performanceData: [
-      { name: "Week 1", score: 65 },
-      { name: "Week 2", score: 68 },
-      { name: "Week 3", score: 72 },
-      { name: "Week 4", score: 75 },
-      { name: "Week 5", score: 70 },
-      { name: "Week 6", score: 78 },
-      { name: "Week 7", score: 82 },
-    ],
-    upcomingLessons: [
-      {
-        id: "1",
-        title: "Advanced Conversation Techniques",
-        date: "Tomorrow, 3:00 PM",
-        duration: "45 min",
-      },
-      {
-        id: "2",
-        title: "Idiomatic Expressions Workshop",
-        date: "Friday, 5:30 PM",
-        duration: "30 min",
-      },
-    ],
-    subscription: {
-      plan: "Premium Plan",
-      status: "Active",
-      renewalDate: "June 15, 2023",
-      billingCycle: "Monthly",
-      nextPayment: "$19.99",
-    },
-  };
+  // Fetch dashboard data from Supabase
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchUserDashboardData(DEMO_USER_ID);
+        if (data) {
+          setDashboardData(data);
+        } else {
+          setError("Failed to load dashboard data");
+        }
+      } catch (err) {
+        setError("An error occurred while loading data");
+        console.error("Dashboard data loading error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    loadDashboardData();
+  }, []);
+
+  // Transform Supabase data to match component expectations
+  const transformedData = dashboardData
+    ? {
+        name: dashboardData.profile.name || "User",
+        email: dashboardData.profile.email || "",
+        avatar:
+          dashboardData.profile.avatar ||
+          "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
+        level: dashboardData.profile.level || "Beginner",
+        cefrLevel: dashboardData.profile.cefr_level || "A1",
+        levelNumber: dashboardData.profile.level_number || 1,
+        streak: dashboardData.profile.streak || 0,
+        totalHours: dashboardData.profile.total_hours || 0,
+        joinDate: dashboardData.profile.join_date || "Recently",
+        languageStats: {
+          english: {
+            language: "English",
+            fluency: dashboardData.languageStats?.english_fluency || 0,
+            vocabulary: dashboardData.languageStats?.english_vocabulary || 0,
+            grammar: dashboardData.languageStats?.english_grammar || 0,
+            pronunciation:
+              dashboardData.languageStats?.english_pronunciation || 0,
+          },
+          spanish: {
+            language: "Spanish",
+            fluency: dashboardData.languageStats?.spanish_fluency || 0,
+            vocabulary: dashboardData.languageStats?.spanish_vocabulary || 0,
+            grammar: dashboardData.languageStats?.spanish_grammar || 0,
+            pronunciation:
+              dashboardData.languageStats?.spanish_pronunciation || 0,
+          },
+        },
+        recentActivities: dashboardData.recentActivities.map((activity) => ({
+          id: activity.id,
+          activity: activity.activity,
+          date: activity.date || "Recently",
+          duration: activity.duration || "0 min",
+          score: activity.score || 0,
+        })),
+        performanceData: dashboardData.performanceData.map((data) => ({
+          name: data.name,
+          score: data.score || 0,
+        })),
+        upcomingLessons: dashboardData.upcomingLessons.map((lesson) => ({
+          id: lesson.id,
+          title: lesson.title,
+          date: lesson.date || "TBD",
+          duration: lesson.duration || "30 min",
+        })),
+        subscription: dashboardData.subscription
+          ? {
+              plan: dashboardData.subscription.plan || "Free Plan",
+              status: dashboardData.subscription.status || "Inactive",
+              renewalDate: dashboardData.subscription.renewal_date || "N/A",
+              billingCycle:
+                dashboardData.subscription.billing_cycle || "Monthly",
+              nextPayment: dashboardData.subscription.next_payment || "$0.00",
+              features: dashboardData.subscription.features || [],
+            }
+          : {
+              plan: "Free Plan",
+              status: "Inactive",
+              renewalDate: "N/A",
+              billingCycle: "Monthly",
+              nextPayment: "$0.00",
+              features: [],
+            },
+      }
+    : null;
+
+  // Extract data from the transformed profile for easier access
   const {
-    userProfile,
+    name,
+    email,
+    avatar,
+    level,
+    cefrLevel,
+    levelNumber,
+    streak,
+    totalHours,
+    joinDate,
     languageStats,
     recentActivities,
     performanceData,
     upcomingLessons,
     subscription,
-  } = mockData;
+  } = transformedData || {
+    name: "Loading...",
+    email: "",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Loading",
+    level: "Loading...",
+    cefrLevel: "",
+    levelNumber: 0,
+    streak: 0,
+    totalHours: 0,
+    joinDate: "",
+    languageStats: {
+      english: {
+        language: "English",
+        fluency: 0,
+        vocabulary: 0,
+        grammar: 0,
+        pronunciation: 0,
+      },
+      spanish: {
+        language: "Spanish",
+        fluency: 0,
+        vocabulary: 0,
+        grammar: 0,
+        pronunciation: 0,
+      },
+    },
+    recentActivities: [],
+    performanceData: [],
+    upcomingLessons: [],
+    subscription: {
+      plan: "",
+      status: "",
+      renewalDate: "",
+      billingCycle: "",
+      nextPayment: "",
+      features: [],
+    },
+  };
 
   const handleStartPractice = () => {
     setShowPracticeOptions(true);
@@ -175,6 +274,33 @@ const Dashboard = () => {
   const handleBackToDashboard = () => {
     setShowPracticeOptions(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8 flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 md:p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">
+            Error Loading Dashboard
+          </h2>
+          <p className="text-gray-600">{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -188,13 +314,13 @@ const Dashboard = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
             <div className="flex items-center gap-4 mb-4 md:mb-0">
               <Avatar className="h-16 w-16 border-2 border-primary">
-                <AvatarImage src={userProfile.avatar} alt={userProfile.name} />
-                <AvatarFallback>{userProfile.name.charAt(0)}</AvatarFallback>
+                <AvatarImage src={avatar} alt={name} />
+                <AvatarFallback>{name.charAt(0)}</AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-2xl font-bold">{userProfile.name}</h1>
+                <h1 className="text-2xl font-bold">{name}</h1>
                 <p className="text-gray-500">
-                  {userProfile.level} • {userProfile.streak} day streak
+                  {level} • {streak} day streak
                 </p>
               </div>
             </div>
@@ -224,9 +350,7 @@ const Dashboard = () => {
               <CardContent>
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-3xl font-bold">
-                      {userProfile.streak} days
-                    </p>
+                    <p className="text-3xl font-bold">{streak} days</p>
                     <p className="text-sm text-gray-500">Keep it up!</p>
                   </div>
                   <div className="flex -space-x-2">
@@ -255,12 +379,8 @@ const Dashboard = () => {
               <CardContent>
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-3xl font-bold">
-                      {userProfile.totalHours} hours
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Since {userProfile.joinDate}
-                    </p>
+                    <p className="text-3xl font-bold">{totalHours} hours</p>
+                    <p className="text-sm text-gray-500">Since {joinDate}</p>
                   </div>
                   <div className="h-10 w-20 bg-gray-100 rounded-md flex items-end overflow-hidden">
                     <div className="h-6 w-full bg-primary rounded-md"></div>
@@ -279,11 +399,11 @@ const Dashboard = () => {
               <CardContent>
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-3xl font-bold">{userProfile.level}</p>
-                    <p className="text-sm text-gray-500">B1-B2 CEFR</p>
+                    <p className="text-3xl font-bold">{level}</p>
+                    <p className="text-sm text-gray-500">{cefrLevel}</p>
                   </div>
                   <Badge className="bg-gradient-to-r from-primary to-purple-600">
-                    Level 4
+                    Level {levelNumber}
                   </Badge>
                 </div>
               </CardContent>
@@ -458,8 +578,9 @@ const Dashboard = () => {
                       </Badge>
                     </div>
                     <div className="mt-2 text-sm text-gray-600">
-                      <p>Unlimited AI conversation practice</p>
-                      <p>All language topics access</p>
+                      {subscription.features.map((feature, index) => (
+                        <p key={index}>{feature}</p>
+                      ))}
                     </div>
                   </div>
 
@@ -575,7 +696,7 @@ const Dashboard = () => {
                     <div className="text-center">
                       <div className="font-bold text-lg mb-1">English</div>
                       <div className="text-sm text-gray-500">
-                        Your level: Intermediate
+                        Your level: {level}
                       </div>
                     </div>
                   </Button>
