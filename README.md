@@ -42,7 +42,7 @@ export default {
 ## General Issues
 - [CRITICAL] There is no application state. All components have statically driven content. Yes it looks pretty, but nothing is functional
 - Authentication mechanism missing.
-- Translations are hardcoded, maybe we need a content delivery service when we expand for translations
+- Translations are hardcoded, maybe we need a content delivery service when we expand for translations. Quick solve is to at least have one file or directory with all translations and call it from different areas of the application
 - ToS and Privacy Policy missing
 
 ## Home Page
