@@ -24,6 +24,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import ConversationInterface from "@/components/conversation/ConversationInterface";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, Circle } from "lucide-react";
 
 interface CourseMaterialProps {
   courseId?: number;
@@ -47,6 +50,13 @@ const CourseMaterial = ({
   const [dbMaterials, setDbMaterials] = useState<any[]>([]);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [flags, setFlags] = useState<any>({
+    watched_video: false,
+    viewed_materials: false,
+    read_transcript: false,
+    practiced_script: false,
+    practiced_open: false,
+  });
 
   // Load course + lessons from Supabase (Numbers 1–10)
   React.useEffect(() => {
@@ -81,12 +91,20 @@ const CourseMaterial = ({
         if (user?.id) {
           const { data: prog } = await supabase
             .from('user_progress')
-            .select('lesson_id,status')
+            .select('lesson_id,status,watched_video,viewed_materials,read_transcript,practiced_script,practiced_open')
             .eq('user_id', user.id);
           const completed = (prog || [])
             .filter((p: any) => p.status === 'completed')
             .map((p: any) => p.lesson_id as string);
           setCompletedLessonIds(completed);
+          const current = (prog || []).find((p: any) => p.lesson_id === firstLessonId) || {};
+          setFlags({
+            watched_video: !!current.watched_video,
+            viewed_materials: !!current.viewed_materials,
+            read_transcript: !!current.read_transcript,
+            practiced_script: !!current.practiced_script,
+            practiced_open: !!current.practiced_open,
+          });
         }
       }
       setLoading(false);
@@ -95,8 +113,7 @@ const CourseMaterial = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const currentLessonData = dbLessons[currentLesson] || {} as any;
-
+  // When lesson changes, refresh materials + flags
   const handleLessonClick = async (index: number) => {
     setCurrentLesson(index);
     const lesson = dbLessons[index];
@@ -106,8 +123,56 @@ const CourseMaterial = ({
         .select('*')
         .eq('lesson_id', lesson.id);
       setDbMaterials(mats || []);
+
+      if (user?.id) {
+        const { data: progRow } = await supabase
+          .from('user_progress')
+          .select('watched_video,viewed_materials,read_transcript,practiced_script,practiced_open')
+          .eq('user_id', user.id)
+          .eq('lesson_id', lesson.id)
+          .maybeSingle();
+        setFlags({
+          watched_video: !!progRow?.watched_video,
+          viewed_materials: !!progRow?.viewed_materials,
+          read_transcript: !!progRow?.read_transcript,
+          practiced_script: !!progRow?.practiced_script,
+          practiced_open: !!progRow?.practiced_open,
+        });
+      }
     }
   };
+
+  // Helper to update flags in DB
+  const updateProgressFlag = async (patch: Partial<typeof flags>) => {
+    const lesson = dbLessons[currentLesson];
+    if (!lesson?.id || !user?.id) return;
+    const newFlags = { ...flags, ...patch };
+    setFlags(newFlags);
+    await supabase.from('user_progress').upsert({
+      user_id: user.id,
+      lesson_id: lesson.id,
+      status: completedLessonIds.includes(lesson.id) ? 'completed' : 'in_progress',
+      last_viewed_at: new Date().toISOString(),
+      watched_video: newFlags.watched_video,
+      viewed_materials: newFlags.viewed_materials,
+      read_transcript: newFlags.read_transcript,
+      practiced_script: newFlags.practiced_script,
+      practiced_open: newFlags.practiced_open,
+    });
+  };
+
+  // Mark flags when visiting tabs
+  React.useEffect(() => {
+    if (activeTab === 'video' && !flags.watched_video) updateProgressFlag({ watched_video: true });
+    if (activeTab === 'materials' && !flags.viewed_materials) updateProgressFlag({ viewed_materials: true });
+    if (activeTab === 'transcript' && !flags.read_transcript) updateProgressFlag({ read_transcript: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentLesson]);
+
+  const currentLessonData = dbLessons[currentLesson] || {} as any;
+  const numbersTranscript = `Counting Numbers (1–10):\n1 One (wʌn)\n2 Two (tuː)\n3 Three (θriː)\n4 Four (fɔːr)\n5 Five (faɪv)\n6 Six (sɪks)\n7 Seven (ˈsɛv.ən)\n8 Eight (eɪt)\n9 Nine (naɪn)\n10 Ten (tɛn)\n\nAdding Numbers and Basic Operations:\n2 + 3 = 5 (two plus three equals five)\n4 − 1 = 3 (four minus one equals three)\n2 × 2 = 4 (two times two equals four)\n6 ÷ 3 = 2 (six divided by three equals two)\n\nWhat time is it? (Examples)\nIt's 3:00 (three o'clock).\nIt's 3:30 (three thirty / half past three).\nIt's 3:15 (three fifteen / a quarter past three).\n\nHow much money is there?\nThere are 5 dollars.\nThere are 10 euros.\nThere are 100 yen.\n\nMonetary units in America, Europe, and Asia:\nUSA: dollars (USD), cents.\nEurope: euros (EUR), cents.\nJapan: yen (JPY).\n`; 
+  const transcriptToShow = currentLessonData?.transcript?.trim()?.length ? currentLessonData.transcript : numbersTranscript;
+  const [practiceMode, setPracticeMode] = useState<'script' | 'open'>('script');
 
   const handleLessonComplete = async () => {
     const lesson = dbLessons[currentLesson];
@@ -117,6 +182,11 @@ const CourseMaterial = ({
       lesson_id: lesson.id,
       status: 'completed',
       last_viewed_at: new Date().toISOString(),
+      watched_video: flags.watched_video,
+      viewed_materials: flags.viewed_materials,
+      read_transcript: flags.read_transcript,
+      practiced_script: flags.practiced_script,
+      practiced_open: flags.practiced_open,
     });
     setCompletedLessonIds((prev) => Array.from(new Set([...prev, lesson.id])));
   };
@@ -154,6 +224,8 @@ const CourseMaterial = ({
       },
     });
     if (!error) setFeedback((data as any)?.feedback || "");
+    // Mark script practice done
+    if (!flags.practiced_script) updateProgressFlag({ practiced_script: true });
   };
 
   const progressPct = dbLessons.length
@@ -174,7 +246,7 @@ const CourseMaterial = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sidebar with lessons */}
         <div className="lg:col-span-1">
-          <Card>
+          <Card className="min-h-[720px]">
             <CardHeader className="pb-3">
               <CardTitle>{dbCourse?.title || 'Numbers 1–10'}</CardTitle>
               <CardDescription>Instructor: {dbCourse?.instructor || 'Lingua Team'}</CardDescription>
@@ -189,10 +261,28 @@ const CourseMaterial = ({
                   value={progressPct}
                   className="h-2"
                 />
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    {flags.watched_video ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
+                    <span>Video watched</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {flags.viewed_materials ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
+                    <span>Materials viewed</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {flags.read_transcript ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
+                    <span>Transcript read</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {(flags.practiced_script && flags.practiced_open) ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Circle className="h-4 w-4 text-gray-400" />}
+                    <span>Practice sessions (script + open)</span>
+                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[400px] p-4">
+              <ScrollArea className="h-full p-4">
                 <div className="space-y-1">
                   {dbLessons.map((lesson, index) => (
                     <div key={lesson.id} className="mb-2">
@@ -227,7 +317,7 @@ const CourseMaterial = ({
 
         {/* Main content area */}
         <div className="lg:col-span-2">
-          <Card>
+          <Card className="min-h-[720px]">
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
@@ -343,33 +433,55 @@ const CourseMaterial = ({
                     </h3>
                     <div className="p-4 border rounded-md bg-muted/30">
                       <p className="whitespace-pre-line">
-                        {currentLessonData?.transcript || ''}
+                        {transcriptToShow}
                       </p>
                     </div>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="practice" className="m-0">
-                  <div className="p-6 space-y-4">
-                    <h3 className="text-lg font-medium">Pronunciation Practice</h3>
+                  <div className="p-6 space-y-4 min-h-[calc(720px-65px)]">
                     <div className="flex gap-2">
-                      <Button onClick={startPractice} disabled={recording}>
-                        {recording ? 'Listening...' : 'Start Recording'}
-                      </Button>
-                      <Button variant="outline" onClick={evaluatePractice} disabled={!recognizedText}>
-                        Get Feedback
-                      </Button>
+                      <Button variant={practiceMode === 'script' ? 'default' : 'outline'} onClick={() => setPracticeMode('script')}>Part 1: Script Practice</Button>
+                      <Button variant={practiceMode === 'open' ? 'default' : 'outline'} onClick={() => { setPracticeMode('open'); if (!flags.practiced_open) updateProgressFlag({ practiced_open: true }); }}>Part 2: Open Conversation</Button>
                     </div>
-                    <div className="space-y-2">
-                      <div>
-                        <div className="text-sm text-muted-foreground">Recognized</div>
-                        <div className="p-3 rounded border bg-muted/30 min-h-[40px]">{recognizedText || '—'}</div>
+
+                    {practiceMode === 'script' ? (
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">Read the highlighted lines aloud. Then click Get Feedback.</p>
+                        <div className="p-3 rounded border bg-muted/30 whitespace-pre-line max-h-56 overflow-auto">
+                          {transcriptToShow}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={startPractice} disabled={recording}>
+                            {recording ? 'Listening...' : 'Start Recording'}
+                          </Button>
+                          <Button variant="outline" onClick={evaluatePractice} disabled={!recognizedText}>
+                            Get Feedback
+                          </Button>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="text-sm text-muted-foreground">Recognized</div>
+                            <div className="p-3 rounded border bg-muted/30 min-h-[40px]">{recognizedText || '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-muted-foreground">Feedback</div>
+                            <div className="p-3 rounded border bg-muted/30 min-h-[60px] whitespace-pre-line">{feedback || '—'}</div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">Feedback</div>
-                        <div className="p-3 rounded border bg-muted/30 min-h-[60px] whitespace-pre-line">{feedback || '—'}</div>
+                    ) : (
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">Speak naturally about numbers, time, and money. Keep responses short and clear.</p>
+                        <div className="border rounded-md">
+                          <ConversationInterface
+                            language="english"
+                            topic="Numbers and Everyday Math"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>

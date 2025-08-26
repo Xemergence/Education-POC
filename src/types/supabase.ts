@@ -251,9 +251,12 @@ export type Database = {
           email: string
           id: string
           join_date: string | null
+          learning_goals: string[] | null
           level: string | null
           level_number: number | null
           name: string
+          preferred_language: string | null
+          proficiency_level: string | null
           streak: number | null
           total_hours: number | null
           updated_at: string | null
@@ -266,9 +269,12 @@ export type Database = {
           email: string
           id?: string
           join_date?: string | null
+          learning_goals?: string[] | null
           level?: string | null
           level_number?: number | null
           name: string
+          preferred_language?: string | null
+          proficiency_level?: string | null
           streak?: number | null
           total_hours?: number | null
           updated_at?: string | null
@@ -281,9 +287,12 @@ export type Database = {
           email?: string
           id?: string
           join_date?: string | null
+          learning_goals?: string[] | null
           level?: string | null
           level_number?: number | null
           name?: string
+          preferred_language?: string | null
+          proficiency_level?: string | null
           streak?: number | null
           total_hours?: number | null
           updated_at?: string | null
@@ -416,22 +425,37 @@ export type Database = {
           id: string
           last_viewed_at: string | null
           lesson_id: string | null
+          practiced_open: boolean | null
+          practiced_script: boolean | null
+          read_transcript: boolean | null
           status: string
           user_id: string
+          viewed_materials: boolean | null
+          watched_video: boolean | null
         }
         Insert: {
           id?: string
           last_viewed_at?: string | null
           lesson_id?: string | null
+          practiced_open?: boolean | null
+          practiced_script?: boolean | null
+          read_transcript?: boolean | null
           status: string
           user_id: string
+          viewed_materials?: boolean | null
+          watched_video?: boolean | null
         }
         Update: {
           id?: string
           last_viewed_at?: string | null
           lesson_id?: string | null
+          practiced_open?: boolean | null
+          practiced_script?: boolean | null
+          read_transcript?: boolean | null
           status?: string
           user_id?: string
+          viewed_materials?: boolean | null
+          watched_video?: boolean | null
         }
         Relationships: [
           {

@@ -26,11 +26,34 @@ export const fetchUserDashboardData = async (
       .from("profiles")
       .select("*")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
+    // If no profile yet (e.g., first visit or demo), return a safe default instead of null
     if (profileError || !profile) {
-      console.error("Error fetching profile:", profileError);
-      return null;
+      const nowIso = new Date().toISOString();
+      const defaultProfile: any = {
+        id: "00000000-0000-0000-0000-000000000000",
+        user_id: userId,
+        name: "Learner",
+        email: "",
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Learner",
+        level: "Beginner",
+        cefr_level: "A1",
+        level_number: 1,
+        streak: 0,
+        total_hours: 0,
+        join_date: nowIso.slice(0, 10),
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      return {
+        profile: defaultProfile,
+        languageStats: null,
+        recentActivities: [],
+        performanceData: [],
+        upcomingLessons: [],
+        subscription: null,
+      };
     }
 
     // Fetch language stats
@@ -38,7 +61,7 @@ export const fetchUserDashboardData = async (
       .from("language_stats")
       .select("*")
       .eq("profile_id", profile.id)
-      .single();
+      .maybeSingle();
 
     if (languageStatsError) {
       console.error("Error fetching language stats:", languageStatsError);
@@ -50,7 +73,7 @@ export const fetchUserDashboardData = async (
       .select("*")
       .eq("profile_id", profile.id)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (activitiesError) {
       console.error("Error fetching recent activities:", activitiesError);
@@ -83,7 +106,7 @@ export const fetchUserDashboardData = async (
       .from("subscriptions")
       .select("*")
       .eq("profile_id", profile.id)
-      .single();
+      .maybeSingle();
 
     if (subscriptionError) {
       console.error("Error fetching subscription:", subscriptionError);

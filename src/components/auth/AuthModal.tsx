@@ -49,9 +49,29 @@ const AuthModal = ({
   const handleSignUp = async (data: any) => {
     setIsLoading(true);
     try {
-      const { email, password } = data || {};
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { email, password, name, preferredLanguage, proficiencyLevel } = data || {};
+      const { data: signUpRes, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+
+      const userId = signUpRes.user?.id;
+      if (userId) {
+        await supabase.from('profiles').upsert({
+          user_id: userId,
+          name: name || email.split('@')[0],
+          email,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name || 'User')}`,
+          level: 'Beginner',
+          cefr_level: 'A1',
+          level_number: 1,
+          streak: 0,
+          total_hours: 0,
+          join_date: new Date().toISOString().slice(0,10),
+          updated_at: new Date().toISOString(),
+          preferred_language: preferredLanguage || 'english',
+          proficiency_level: proficiencyLevel || 'beginner',
+        });
+      }
+
       onSignUpSuccess(data);
       onOpenChange(false);
     } catch (error) {

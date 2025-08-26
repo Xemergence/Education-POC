@@ -103,7 +103,7 @@ const ConversationInterface = ({
   };
 
   return (
-    <div className="flex flex-col h-[700px] w-full max-w-4xl mx-auto rounded-xl shadow-lg overflow-hidden bg-white">
+    <div className="flex flex-col h-[720px] w-full max-w-4xl mx-auto rounded-xl shadow-lg overflow-hidden bg-white">
       {/* Conversation Header */}
       <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
         <div className="flex items-center space-x-3">
