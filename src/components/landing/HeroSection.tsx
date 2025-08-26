@@ -100,8 +100,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 </div>
               </div>
               <p className="text-sm text-gray-700">
-                "¡Hola! ¿Cómo estás hoy? Let's practice your Spanish
-                conversation skills!"
+                "Hi! Ready to practice your English? Let's start with numbers 1–10 and build confidence together."
               </p>
             </div>
           </div>

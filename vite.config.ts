@@ -7,12 +7,15 @@ const conditionalPlugins: [string, Record<string, any>][] = [];
 
 // @ts-ignore
 if (process.env.TEMPO === "true") {
-  conditionalPlugins.push(["tempo-devtools/swc", {}]);
+  /* conditionalPlugins.push(["tempo-devtools/swc", {}]) [deprecated] */
 }
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: process.env.NODE_ENV === "development" ? "/" : process.env.VITE_BASE_PATH || "/",
+  base:
+    process.env.NODE_ENV === "development"
+      ? "/"
+      : process.env.VITE_BASE_PATH || "/",
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
   },
@@ -30,6 +33,16 @@ export default defineConfig({
   },
   server: {
     // @ts-ignore
-    allowedHosts: true,
-  }
+    allowedHosts: process.env.TEMPO === "true" ? true : undefined,
+    host: true,
+    port: 3000,
+    proxy: {
+      // Proxy any clerk requests to the correct CDN
+      "/clerk": {
+        target: "https://js.clerk.dev",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/clerk/, ""),
+      },
+    },
+  },
 });

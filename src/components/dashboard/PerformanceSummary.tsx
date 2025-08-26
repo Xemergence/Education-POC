@@ -101,19 +101,19 @@ const PerformanceSummary = ({
     { date: "Sat", fluency: 78, accuracy: 82, vocabulary: 73 },
     { date: "Sun", fluency: 80, accuracy: 85, vocabulary: 75 },
   ],
-  language = "Spanish",
+  language = "English",
   sessionDuration = 25,
   completedExercises = 12,
   masteredPhrases = [
-    "¿Cómo estás?",
-    "Me gustaría practicar español",
-    "¿Puedes hablar más despacio?",
-    "Estoy aprendiendo español",
+    "How are you?",
+    "I would like to practice English",
+    "Could you speak more slowly?",
+    "I am learning English",
   ],
   improvementAreas = [
-    "Past tense conjugation",
-    "Subjunctive mood",
-    "Idiomatic expressions",
+    "Pronouncing numbers 1–10",
+    "Basic question forms",
+    "Everyday expressions",
   ],
 }: PerformanceSummaryProps) => {
   return (

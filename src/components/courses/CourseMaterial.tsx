@@ -22,6 +22,8 @@ import {
   ChevronRight,
   CheckCircle2,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 interface CourseMaterialProps {
   courseId?: number;
@@ -34,101 +36,129 @@ const CourseMaterial = ({
 }: CourseMaterialProps) => {
   const [activeTab, setActiveTab] = useState("video");
   const [currentLesson, setCurrentLesson] = useState(0);
-  const [completedLessons, setCompletedLessons] = useState<number[]>([0]);
+  const [recording, setRecording] = useState(false);
+  const [recognizedText, setRecognizedText] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const { user } = useAuth();
 
-  // Mock course data
-  const course = {
-    id: 1,
-    title: "Spanish Conversation Basics",
-    description:
-      "Learn essential conversation patterns and vocabulary for everyday situations in Spanish.",
-    instructor: "Maria Rodriguez",
-    thumbnail:
-      "https://images.unsplash.com/photo-1596524430615-b46475ddff6e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80",
-    duration: "4h 30m",
-    level: "Beginner",
-    rating: 4.8,
-    progress: 25,
-    lessons: [
-      {
-        id: 0,
-        title: "Introduction to Spanish Conversations",
-        duration: "15:30",
-        videoUrl: "https://example.com/video1.mp4",
-        description: "An overview of the course and basic Spanish greetings.",
-        materials: [
-          { id: 1, title: "Course Syllabus", type: "pdf" },
-          { id: 2, title: "Spanish Greetings Cheat Sheet", type: "pdf" },
-        ],
-        transcript:
-          "Welcome to Spanish Conversation Basics! In this course, we'll learn essential phrases and vocabulary for everyday conversations in Spanish. Let's start with basic greetings: 'Hola' means 'Hello', 'Buenos días' means 'Good morning'...",
-      },
-      {
-        id: 1,
-        title: "Greetings and Introductions",
-        duration: "22:15",
-        videoUrl: "https://example.com/video2.mp4",
-        description:
-          "Learn how to introduce yourself and greet others in Spanish.",
-        materials: [
-          { id: 3, title: "Introduction Phrases Worksheet", type: "pdf" },
-          { id: 4, title: "Practice Dialogues", type: "doc" },
-        ],
-        transcript:
-          "In this lesson, we'll focus on introductions. To introduce yourself, you can say 'Me llamo...' which means 'My name is...' or 'Soy...' which simply means 'I am...'. Let's practice these phrases together...",
-      },
-      {
-        id: 2,
-        title: "Asking Basic Questions",
-        duration: "18:45",
-        videoUrl: "https://example.com/video3.mp4",
-        description: "Learn to ask and answer common questions in Spanish.",
-        materials: [
-          { id: 5, title: "Question Words in Spanish", type: "pdf" },
-          { id: 6, title: "Practice Exercises", type: "pdf" },
-        ],
-        transcript:
-          "Now let's learn how to ask questions in Spanish. The main question words are: '¿Qué?' (What?), '¿Quién?' (Who?), '¿Dónde?' (Where?), '¿Cuándo?' (When?), '¿Por qué?' (Why?), and '¿Cómo?' (How?)...",
-      },
-      {
-        id: 3,
-        title: "Everyday Vocabulary",
-        duration: "25:10",
-        videoUrl: "https://example.com/video4.mp4",
-        description: "Essential vocabulary for daily conversations.",
-        materials: [
-          { id: 7, title: "Vocabulary List", type: "pdf" },
-          { id: 8, title: "Flashcards", type: "zip" },
-        ],
-        transcript:
-          "In this lesson, we'll cover essential vocabulary for everyday situations. We'll learn words related to time, food, transportation, and more. Let's start with time expressions: 'hoy' means 'today', 'mañana' means 'tomorrow'...",
-      },
-    ],
-  };
+  // New DB-backed state
+  const [dbCourse, setDbCourse] = useState<any | null>(null);
+  const [dbLessons, setDbLessons] = useState<any[]>([]);
+  const [dbMaterials, setDbMaterials] = useState<any[]>([]);
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const currentLessonData = course.lessons[currentLesson];
+  // Load course + lessons from Supabase (Numbers 1–10)
+  React.useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      // Fetch the only seeded course
+      const { data: courses } = await supabase
+        .from('courses')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(1);
+      const course = courses?.[0] || null;
+      setDbCourse(course);
 
-  const handleLessonClick = (index: number) => {
+      if (course) {
+        const { data: lessons } = await supabase
+          .from('lessons')
+          .select('*')
+          .eq('course_id', course.id)
+          .order('order', { ascending: true });
+        setDbLessons(lessons || []);
+
+        const firstLessonId = lessons?.[0]?.id;
+        if (firstLessonId) {
+          const { data: mats } = await supabase
+            .from('materials')
+            .select('*')
+            .eq('lesson_id', firstLessonId);
+          setDbMaterials(mats || []);
+        }
+
+        if (user?.id) {
+          const { data: prog } = await supabase
+            .from('user_progress')
+            .select('lesson_id,status')
+            .eq('user_id', user.id);
+          const completed = (prog || [])
+            .filter((p: any) => p.status === 'completed')
+            .map((p: any) => p.lesson_id as string);
+          setCompletedLessonIds(completed);
+        }
+      }
+      setLoading(false);
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const currentLessonData = dbLessons[currentLesson] || {} as any;
+
+  const handleLessonClick = async (index: number) => {
     setCurrentLesson(index);
-  };
-
-  const handleLessonComplete = () => {
-    if (!completedLessons.includes(currentLesson)) {
-      setCompletedLessons([...completedLessons, currentLesson]);
+    const lesson = dbLessons[index];
+    if (lesson?.id) {
+      const { data: mats } = await supabase
+        .from('materials')
+        .select('*')
+        .eq('lesson_id', lesson.id);
+      setDbMaterials(mats || []);
     }
   };
 
-  const handleNextLesson = () => {
-    if (currentLesson < course.lessons.length - 1) {
-      setCurrentLesson(currentLesson + 1);
-    }
+  const handleLessonComplete = async () => {
+    const lesson = dbLessons[currentLesson];
+    if (!lesson?.id || !user?.id) return;
+    await supabase.from('user_progress').upsert({
+      user_id: user.id,
+      lesson_id: lesson.id,
+      status: 'completed',
+      last_viewed_at: new Date().toISOString(),
+    });
+    setCompletedLessonIds((prev) => Array.from(new Set([...prev, lesson.id])));
   };
 
-  const handlePreviousLesson = () => {
-    if (currentLesson > 0) {
-      setCurrentLesson(currentLesson - 1);
+  const startPractice = async () => {
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Recognition) {
+      alert('Speech Recognition is not supported in this browser');
+      return;
     }
+    const recognition = new Recognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    setRecognizedText("");
+    setFeedback("");
+    setRecording(true);
+
+    recognition.onresult = (event: any) => {
+      const text = event.results[0][0].transcript;
+      setRecognizedText(text);
+    };
+    recognition.onend = () => {
+      setRecording(false);
+    };
+    recognition.start();
   };
+
+  const evaluatePractice = async () => {
+    if (!recognizedText) return;
+    const { data, error } = await supabase.functions.invoke('supabase-functions-chat', {
+      body: {
+        lesson_id: currentLessonData?.id || null,
+        transcript: recognizedText,
+        user_id: user?.id || null,
+      },
+    });
+    if (!error) setFeedback((data as any)?.feedback || "");
+  };
+
+  const progressPct = dbLessons.length
+    ? Math.round((completedLessonIds.length / dbLessons.length) * 100)
+    : 0;
 
   return (
     <div className="container mx-auto py-8 px-4 md:px-6 bg-white">
@@ -146,22 +176,17 @@ const CourseMaterial = ({
         <div className="lg:col-span-1">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>{course.title}</CardTitle>
-              <CardDescription>Instructor: {course.instructor}</CardDescription>
+              <CardTitle>{dbCourse?.title || 'Numbers 1–10'}</CardTitle>
+              <CardDescription>Instructor: {dbCourse?.instructor || 'Lingua Team'}</CardDescription>
               <div className="mt-2">
                 <div className="flex justify-between text-sm mb-1">
                   <span>Course Progress</span>
                   <span>
-                    {Math.round(
-                      (completedLessons.length / course.lessons.length) * 100,
-                    )}
-                    %
+                    {progressPct}%
                   </span>
                 </div>
                 <Progress
-                  value={
-                    (completedLessons.length / course.lessons.length) * 100
-                  }
+                  value={progressPct}
                   className="h-2"
                 />
               </div>
@@ -169,14 +194,14 @@ const CourseMaterial = ({
             <CardContent className="p-0">
               <ScrollArea className="h-[400px] p-4">
                 <div className="space-y-1">
-                  {course.lessons.map((lesson, index) => (
+                  {dbLessons.map((lesson, index) => (
                     <div key={lesson.id} className="mb-2">
                       <button
                         className={`w-full text-left p-3 rounded-md flex items-start gap-3 ${currentLesson === index ? "bg-primary/10" : "hover:bg-muted"}`}
                         onClick={() => handleLessonClick(index)}
                       >
                         <div className="mt-0.5">
-                          {completedLessons.includes(index) ? (
+                          {completedLessonIds.includes(lesson.id) ? (
                             <CheckCircle2 className="h-5 w-5 text-green-500" />
                           ) : (
                             <div className="h-5 w-5 rounded-full border-2 border-muted-foreground flex items-center justify-center text-xs">
@@ -188,7 +213,7 @@ const CourseMaterial = ({
                           <div className="font-medium">{lesson.title}</div>
                           <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             <Video className="h-3 w-3" />
-                            {lesson.duration}
+                            {lesson.duration || '—'}
                           </div>
                         </div>
                       </button>
@@ -207,14 +232,14 @@ const CourseMaterial = ({
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-xl">
-                    {currentLessonData.title}
+                    {currentLessonData?.title || 'Counting from 1 to 10'}
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {currentLessonData.description}
+                    {currentLessonData?.description || 'A short introduction to numbers one through ten with examples.'}
                   </CardDescription>
                 </div>
                 <Button variant="outline" onClick={handleLessonComplete}>
-                  {completedLessons.includes(currentLesson)
+                  {currentLessonData?.id && completedLessonIds.includes(currentLessonData.id)
                     ? "Completed"
                     : "Mark as Complete"}
                 </Button>
@@ -227,10 +252,11 @@ const CourseMaterial = ({
                 onValueChange={setActiveTab}
               >
                 <div className="px-6">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="video">Video</TabsTrigger>
                     <TabsTrigger value="materials">Materials</TabsTrigger>
                     <TabsTrigger value="transcript">Transcript</TabsTrigger>
+                    <TabsTrigger value="practice">Pronunciation Practice</TabsTrigger>
                   </TabsList>
                 </div>
 
@@ -240,22 +266,36 @@ const CourseMaterial = ({
                       ratio={16 / 9}
                       className="bg-muted rounded-md overflow-hidden"
                     >
-                      <div className="flex items-center justify-center h-full bg-black/5">
-                        <Video className="h-16 w-16 text-muted-foreground" />
-                      </div>
+                      {currentLessonData?.video_url ? (
+                        <iframe
+                          className="w-full h-full"
+                          src={`https://www.youtube.com/embed/${(currentLessonData.video_url as string).includes('youtube.com') ? (currentLessonData.video_url as string).split('v=')[1] : 'jzLAmPG22pE'}`}
+                          title="Lesson Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <iframe
+                          className="w-full h-full"
+                          src={`https://www.youtube.com/embed/jzLAmPG22pE`}
+                          title="Lesson Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                        />
+                      )}
                     </AspectRatio>
                     <div className="flex justify-between mt-6">
                       <Button
                         variant="outline"
-                        onClick={handlePreviousLesson}
+                        onClick={() => setCurrentLesson((i) => Math.max(0, i - 1))}
                         disabled={currentLesson === 0}
                         className="flex items-center gap-2"
                       >
                         <ChevronLeft className="h-4 w-4" /> Previous
                       </Button>
                       <Button
-                        onClick={handleNextLesson}
-                        disabled={currentLesson === course.lessons.length - 1}
+                        onClick={() => setCurrentLesson((i) => Math.min(dbLessons.length - 1, i + 1))}
+                        disabled={currentLesson >= dbLessons.length - 1}
                         className="flex items-center gap-2"
                       >
                         Next <ChevronRight className="h-4 w-4" />
@@ -270,28 +310,25 @@ const CourseMaterial = ({
                       Lesson Materials
                     </h3>
                     <div className="space-y-3">
-                      {currentLessonData.materials.map((material) => (
+                      {dbMaterials.map((material: any) => (
                         <div
                           key={material.id}
                           className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            {material.type === "pdf" ? (
-                              <FileText className="h-5 w-5 text-red-500" />
-                            ) : material.type === "doc" ? (
-                              <FileText className="h-5 w-5 text-blue-500" />
-                            ) : (
-                              <FileText className="h-5 w-5 text-muted-foreground" />
-                            )}
+                            <FileText className="h-5 w-5 text-muted-foreground" />
                             <span>{material.title}</span>
                           </div>
                           <Button
+                            asChild
                             variant="ghost"
                             size="sm"
                             className="h-8 gap-1"
                           >
-                            <Download className="h-4 w-4" />
-                            Download
+                            <a href={material.url} target="_blank" rel="noreferrer">
+                              <Download className="h-4 w-4" />
+                              Download
+                            </a>
                           </Button>
                         </div>
                       ))}
@@ -306,8 +343,32 @@ const CourseMaterial = ({
                     </h3>
                     <div className="p-4 border rounded-md bg-muted/30">
                       <p className="whitespace-pre-line">
-                        {currentLessonData.transcript}
+                        {currentLessonData?.transcript || ''}
                       </p>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="practice" className="m-0">
+                  <div className="p-6 space-y-4">
+                    <h3 className="text-lg font-medium">Pronunciation Practice</h3>
+                    <div className="flex gap-2">
+                      <Button onClick={startPractice} disabled={recording}>
+                        {recording ? 'Listening...' : 'Start Recording'}
+                      </Button>
+                      <Button variant="outline" onClick={evaluatePractice} disabled={!recognizedText}>
+                        Get Feedback
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-sm text-muted-foreground">Recognized</div>
+                        <div className="p-3 rounded border bg-muted/30 min-h-[40px]">{recognizedText || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Feedback</div>
+                        <div className="p-3 rounded border bg-muted/30 min-h-[60px] whitespace-pre-line">{feedback || '—'}</div>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>

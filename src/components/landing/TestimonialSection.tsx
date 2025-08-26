@@ -124,12 +124,12 @@ const defaultTestimonials: Testimonial[] = [
     id: "1",
     name: "Sarah Johnson",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-    role: "Marketing Professional",
+    role: "Marketing Manager",
     quote:
-      "The AI conversation practice made a huge difference in my Spanish fluency. I can now confidently lead meetings with our international team.",
+      "The AI conversation practice helped me gain confidence in English. I went from struggling with basic numbers to having fluent business conversations.",
     rating: 5,
-    improvement: "Business vocabulary and fluency",
-    language: "Spanish",
+    improvement: "Confidence and fluency",
+    language: "English",
   },
   {
     id: "2",
@@ -155,28 +155,6 @@ const defaultTestimonials: Testimonial[] = [
   },
   {
     id: "4",
-    name: "David Kim",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-    role: "Travel Blogger",
-    quote:
-      "I learned Spanish for my South America trip. The AI conversation practice made me comfortable with everyday phrases and local expressions.",
-    rating: 5,
-    improvement: "Travel vocabulary and local expressions",
-    language: "Spanish",
-  },
-  {
-    id: "5",
-    name: "Priya Patel",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya",
-    role: "Medical Resident",
-    quote:
-      "The platform helped me master medical terminology in Spanish. I can now better communicate with Spanish-speaking patients.",
-    rating: 5,
-    improvement: "Medical vocabulary and patient communication",
-    language: "Spanish",
-  },
-  {
-    id: "6",
     name: "Thomas Weber",
     avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Thomas",
     role: "Business Consultant",

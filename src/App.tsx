@@ -35,7 +35,9 @@ function App() {
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
           </Routes>
-          {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+          {(import.meta.env.VITE_TEMPO === "true" ||
+            process.env.TEMPO === "true") &&
+            useRoutes(routes)}
         </div>
       </Suspense>
     </>

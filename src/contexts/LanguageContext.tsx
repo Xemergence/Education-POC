@@ -1,7 +1,7 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import useLocalStorage from "@/hooks/useLocalStorage";
 
-type Language = "english" | "spanish";
+type Language = "english";
 
 type Translations = {
   [key: string]: {

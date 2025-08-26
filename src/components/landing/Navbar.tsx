@@ -10,6 +10,7 @@ import { Globe, Menu, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AuthModal from "../auth/AuthModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavbarProps {
   onSignInClick?: () => void;
@@ -32,8 +33,8 @@ const Navbar = ({
   const { language, setLanguage, t } = useLanguage();
   const languages = [
     { name: "English", code: "en", contextValue: "english" },
-    { name: "Español", code: "es", contextValue: "spanish" },
   ];
+  const { user, signOut } = useAuth();
 
   // Find the display name based on current language context
   const getCurrentLanguageDisplay = () => {
@@ -62,33 +63,6 @@ const Navbar = ({
   const handleSignUpClick = () => {
     setAuthModalTab("signup");
     setIsAuthModalOpen(true);
-  };
-
-  // Check if user is already authenticated from localStorage
-  const [userData, setUserData] = useState<{
-    isAuthenticated: boolean;
-    userName: string;
-  }>(() => {
-    const savedUser = localStorage.getItem("userData");
-    return savedUser
-      ? JSON.parse(savedUser)
-      : { isAuthenticated: false, userName: "" };
-  });
-
-  const handleAuthSuccess = (data: any) => {
-    const newUserData = {
-      isAuthenticated: true,
-      userName: data.email?.split("@")[0] || "User",
-    };
-
-    // Save to state and localStorage
-    setUserData(newUserData);
-    localStorage.setItem("userData", JSON.stringify(newUserData));
-
-    setIsAuthModalOpen(false);
-
-    // Redirect to dashboard after successful authentication
-    window.location.href = "/dashboard";
   };
 
   return (
@@ -125,7 +99,7 @@ const Navbar = ({
             </Link>
 
             {/* Authenticated-only links */}
-            {userData.isAuthenticated && (
+            {user && (
               <>
                 <Link
                   to="/dashboard"
@@ -151,20 +125,20 @@ const Navbar = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {languages.map((language) => (
+                {languages.map((lang) => (
                   <DropdownMenuItem
-                    key={language.code}
-                    onClick={() => handleLanguageChange(language.name)}
+                    key={lang.code}
+                    onClick={() => handleLanguageChange(lang.name)}
                     className="cursor-pointer"
                   >
-                    {language.name}
+                    {lang.name}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
             {/* Authentication Buttons */}
-            {!userData.isAuthenticated ? (
+            {!user ? (
               <div className="flex items-center space-x-4">
                 <Button variant="ghost" onClick={handleSignInClick}>
                   {t("nav.signin")}
@@ -175,7 +149,7 @@ const Navbar = ({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline">
-                    {userData.userName || t("nav.myaccount")}
+                    {user.email?.split("@")[0] || t("nav.myaccount")}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -189,9 +163,8 @@ const Navbar = ({
                     <Link to="/admin">Admin Panel</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => {
-                      localStorage.removeItem("userData");
-                      setUserData({ isAuthenticated: false, userName: "" });
+                    onClick={async () => {
+                      await signOut();
                       window.location.href = "/";
                     }}
                   >
@@ -242,7 +215,7 @@ const Navbar = ({
               </Link>
 
               {/* Authenticated-only links for mobile */}
-              {userData.isAuthenticated && (
+              {user && (
                 <>
                   <Link
                     to="/dashboard"
@@ -271,28 +244,26 @@ const Navbar = ({
               {/* Language Selector for Mobile */}
               <div className="py-2">
                 <p className="text-sm text-gray-500 mb-2">
-                  {language === "english"
-                    ? "Select Language"
-                    : "Seleccionar Idioma"}
+                  {language === "english" ? "Select Language" : "Select Language"}
                 </p>
                 <div className="flex flex-col space-y-2">
-                  {languages.map((language) => (
+                  {languages.map((lang) => (
                     <button
-                      key={language.code}
+                      key={lang.code}
                       onClick={() => {
-                        handleLanguageChange(language.name);
+                        handleLanguageChange(lang.name);
                         setIsMenuOpen(false);
                       }}
-                      className={`text-left py-1 px-2 rounded ${language === language.contextValue ? "bg-primary/10 text-primary" : "text-gray-600"}`}
+                      className={`text-left py-1 px-2 rounded ${language === lang.contextValue ? "bg-primary/10 text-primary" : "text-gray-600"}`}
                     >
-                      {language.name}
+                      {lang.name}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Authentication Buttons for Mobile */}
-              {!userData.isAuthenticated ? (
+              {!user ? (
                 <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
                   <Button
                     variant="outline"
@@ -314,7 +285,7 @@ const Navbar = ({
                 </div>
               ) : (
                 <Button variant="outline" className="mt-2">
-                  {userData.userName || t("nav.myaccount")}
+                  {user.email?.split("@")[0] || t("nav.myaccount")}
                 </Button>
               )}
             </div>
@@ -327,8 +298,8 @@ const Navbar = ({
         isOpen={isAuthModalOpen}
         onOpenChange={setIsAuthModalOpen}
         defaultTab={authModalTab}
-        onSignInSuccess={handleAuthSuccess}
-        onSignUpSuccess={handleAuthSuccess}
+        onSignInSuccess={() => setIsAuthModalOpen(false)}
+        onSignUpSuccess={() => setIsAuthModalOpen(false)}
       />
     </>
   );

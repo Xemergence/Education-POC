@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import SignInForm from "./SignInForm";
 import SignUpForm from "./SignUpForm";
 import SocialLoginButtons from "./SocialLoginButtons";
+import { supabase } from "@/lib/supabaseClient";
 
 interface AuthModalProps {
   isOpen?: boolean;
@@ -32,12 +33,14 @@ const AuthModal = ({
   const handleSignIn = async (data: any) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { email, password } = data || {};
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       onSignInSuccess(data);
       onOpenChange(false);
     } catch (error) {
       console.error("Sign in error:", error);
+      alert((error as any)?.message || "Failed to sign in");
     } finally {
       setIsLoading(false);
     }
@@ -46,12 +49,14 @@ const AuthModal = ({
   const handleSignUp = async (data: any) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { email, password } = data || {};
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
       onSignUpSuccess(data);
       onOpenChange(false);
     } catch (error) {
       console.error("Sign up error:", error);
+      alert((error as any)?.message || "Failed to sign up");
     } finally {
       setIsLoading(false);
     }

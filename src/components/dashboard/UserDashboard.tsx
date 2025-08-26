@@ -24,6 +24,8 @@ import {
   Calendar,
   ChevronRight,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserDashboardProps {
   userName?: string;
@@ -35,21 +37,66 @@ interface UserDashboardProps {
 const UserDashboard = ({
   userName = "Sarah",
   userAvatar = "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-  userLevel = "Intermediate",
-  userLanguage = "Spanish",
+  userLevel = "Beginner",
+  userLanguage = "English",
 }: UserDashboardProps) => {
-  // Mock data for the dashboard
+  const { user } = useAuth();
+
+  // Live metrics from Supabase
+  const [conversationsCount, setConversationsCount] = React.useState(0);
+  const [completedLessons, setCompletedLessons] = React.useState(0);
+  const [totalLessons, setTotalLessons] = React.useState(0);
+
+  React.useEffect(() => {
+    const load = async () => {
+      // Fetch the single seeded course
+      const { data: courses } = await supabase
+        .from('courses')
+        .select('id,title')
+        .order('created_at', { ascending: true })
+        .limit(1);
+      const course = courses?.[0];
+
+      if (course) {
+        const { count: lessonsCount } = await supabase
+          .from('lessons')
+          .select('id', { count: 'exact', head: true })
+          .eq('course_id', course.id);
+        setTotalLessons(lessonsCount || 0);
+
+        if (user?.id) {
+          const { count: completedCount } = await supabase
+            .from('user_progress')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('status', 'completed');
+          setCompletedLessons(completedCount || 0);
+        }
+      }
+
+      if (user?.id) {
+        const { count: convCount } = await supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        setConversationsCount(convCount || 0);
+      }
+    };
+    load();
+  }, [user?.id]);
+
+  const progressPct = totalLessons > 0
+    ? Math.round((completedLessons / totalLessons) * 100)
+    : 0;
+
   const courseProgress = [
     {
       id: 1,
-      name: "Conversation Basics",
-      progress: 100,
-      total: 10,
-      completed: 10,
+      name: "Numbers 1–10",
+      progress: progressPct,
+      total: totalLessons,
+      completed: completedLessons,
     },
-    { id: 2, name: "Travel Vocabulary", progress: 70, total: 10, completed: 7 },
-    { id: 3, name: "Business Spanish", progress: 30, total: 10, completed: 3 },
-    { id: 4, name: "Advanced Grammar", progress: 0, total: 10, completed: 0 },
   ];
 
   const upcomingLessons = [
@@ -186,7 +233,7 @@ const UserDashboard = ({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">15 completed</div>
+                <div className="text-2xl font-bold">{conversationsCount} completed</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   3 this week
                 </p>
@@ -210,7 +257,7 @@ const UserDashboard = ({
                     <span className="text-sm text-muted-foreground">
                       {course.progress}% complete
                     </span>
-                    <Button variant="ghost" size="sm" className="h-8 gap-1">
+                    <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={() => (window.location.href = '/courses')}>
                       Continue <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>

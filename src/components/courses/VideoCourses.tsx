@@ -14,9 +14,11 @@ import { Input } from "@/components/ui/input";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Progress } from "@/components/ui/progress";
 import { Video, BookOpen, Clock, Star, Search, Filter } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CourseCardProps {
-  id: number;
+  id: string;
   title: string;
   description: string;
   instructor: string;
@@ -26,7 +28,7 @@ interface CourseCardProps {
   rating: number;
   lessons: number;
   progress?: number;
-  onClick: (id: number) => void;
+  onClick: (id: string) => void;
 }
 
 const CourseCard = ({
@@ -104,115 +106,74 @@ const CourseCard = ({
 };
 
 interface VideoCoursesProps {
-  onCourseSelect?: (courseId: number) => void;
+  onCourseSelect?: (courseId: string) => void;
 }
 
 const VideoCourses = ({ onCourseSelect = () => {} }: VideoCoursesProps) => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCourse, setSelectedCourse] = useState<number | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [courses, setCourses] = useState<CourseCardProps[]>([]);
+  const { user } = useAuth();
 
-  // Mock course data
-  const courses = [
-    {
-      id: 1,
-      title: "Spanish Conversation Basics",
-      description:
-        "Learn essential conversation patterns and vocabulary for everyday situations in Spanish.",
-      instructor: "Maria Rodriguez",
-      thumbnail:
-        "https://images.unsplash.com/photo-1596524430615-b46475ddff6e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80",
-      duration: "4h 30m",
-      level: "Beginner",
-      rating: 4.8,
-      lessons: 12,
-      progress: 75,
-      category: "conversation",
-    },
-    {
-      id: 2,
-      title: "Business English Mastery",
-      description:
-        "Develop professional English skills for meetings, presentations, and business correspondence.",
-      instructor: "James Wilson",
-      thumbnail:
-        "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1169&q=80",
-      duration: "6h 15m",
-      level: "Intermediate",
-      rating: 4.6,
-      lessons: 15,
-      progress: 30,
-      category: "business",
-    },
-    {
-      id: 3,
-      title: "Spanish for Travel",
-      description:
-        "Essential Spanish phrases and cultural tips for travelers visiting Spanish-speaking countries.",
-      instructor: "Carlos Vega",
-      thumbnail:
-        "https://images.unsplash.com/photo-1527631746610-bca00a040d60?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80",
-      duration: "3h 45m",
-      level: "Beginner",
-      rating: 4.9,
-      lessons: 10,
-      progress: 0,
-      category: "travel",
-    },
-    {
-      id: 4,
-      title: "Advanced English Grammar",
-      description:
-        "Master complex grammar structures and nuances of the English language for academic and professional contexts.",
-      instructor: "Elizabeth Taylor",
-      thumbnail:
-        "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1073&q=80",
-      duration: "8h 20m",
-      level: "Advanced",
-      rating: 4.7,
-      lessons: 20,
-      progress: 0,
-      category: "grammar",
-    },
-    {
-      id: 5,
-      title: "Spanish Pronunciation Workshop",
-      description:
-        "Improve your Spanish accent and pronunciation with targeted exercises and audio examples.",
-      instructor: "Ana Morales",
-      thumbnail:
-        "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80",
-      duration: "5h 10m",
-      level: "Intermediate",
-      rating: 4.5,
-      lessons: 14,
-      progress: 0,
-      category: "pronunciation",
-    },
-    {
-      id: 6,
-      title: "English for Academic Purposes",
-      description:
-        "Develop English skills for university studies, research papers, and academic presentations.",
-      instructor: "Dr. Robert Chen",
-      thumbnail:
-        "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1170&q=80",
-      duration: "7h 45m",
-      level: "Advanced",
-      rating: 4.8,
-      lessons: 18,
-      progress: 0,
-      category: "academic",
-    },
-  ];
+  React.useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase.from('courses').select('*');
+      if (!error && data) {
+        const onlyFirst = data.filter((c: any) => c.title === 'Numbers 1–10');
+        const mapped: CourseCardProps[] = await Promise.all(
+          (onlyFirst.length ? onlyFirst : data).map(async (c: any) => {
+            // Count lessons for this course
+            const { count: totalLessons } = await supabase
+              .from('lessons')
+              .select('id', { count: 'exact', head: true })
+              .eq('course_id', c.id);
+
+            // Count completed lessons for this user
+            let completed = 0;
+            if (user?.id && (totalLessons || 0) > 0) {
+              const { data: lessonIds } = await supabase
+                .from('lessons')
+                .select('id')
+                .eq('course_id', c.id);
+              const ids = (lessonIds || []).map((l: any) => l.id);
+              if (ids.length) {
+                const { count: completedCount } = await supabase
+                  .from('user_progress')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('user_id', user.id)
+                  .eq('status', 'completed')
+                  .in('lesson_id', ids);
+                completed = completedCount || 0;
+              }
+            }
+
+            const progress = (totalLessons && totalLessons > 0)
+              ? Math.round((completed / (totalLessons as number)) * 100)
+              : 0;
+
+            return {
+              id: c.id,
+              title: c.title,
+              description: c.description || "",
+              instructor: c.instructor || "Lingua Team",
+              thumbnail: c.thumbnail || "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&q=80",
+              duration: c.duration || "",
+              level: c.level || "Beginner",
+              rating: 5.0,
+              lessons: (totalLessons as number) || 0,
+              progress,
+              onClick: () => {},
+            } as CourseCardProps;
+          })
+        );
+        setCourses(mapped);
+      }
+    };
+    load();
+  }, [user?.id]);
 
   const filteredCourses = courses.filter((course) => {
-    // Filter by tab
-    if (activeTab !== "all" && course.category !== activeTab) {
-      return false;
-    }
-
-    // Filter by search query
     if (
       searchQuery &&
       !course.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -220,11 +181,10 @@ const VideoCourses = ({ onCourseSelect = () => {} }: VideoCoursesProps) => {
     ) {
       return false;
     }
-
     return true;
   });
 
-  const handleCourseClick = (id: number) => {
+  const handleCourseClick = (id: string) => {
     setSelectedCourse(id);
     onCourseSelect(id);
   };
