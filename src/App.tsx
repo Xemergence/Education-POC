@@ -1,8 +1,7 @@
 import { Suspense, lazy } from "react";
-import { useRoutes, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Home from "./components/home";
 import Navbar from "./components/landing/Navbar";
-import routes from "tempo-routes";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./routes/dashboard"));
@@ -24,7 +23,6 @@ function App() {
         }
       >
         <div className="pt-20">
-          {" "}
           {/* Add padding for the fixed navbar */}
           <Routes>
             <Route path="/" element={<Home />} />
@@ -35,9 +33,6 @@ function App() {
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
           </Routes>
-          {(import.meta.env.VITE_TEMPO === "true" ||
-            process.env.TEMPO === "true") &&
-            useRoutes(routes)}
         </div>
       </Suspense>
     </>
